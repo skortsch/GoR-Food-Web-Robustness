@@ -1,13 +1,13 @@
 
 #working dir
-setwd("C:/LocalData/susakort/supervision/Patrick Ståhl/data")
+setwd("C:/LocalData/susakort/supervision/Patrick St?hl/data")
 
 #load data
 #biom.data<-read.table("clipboard", dec=",", header=T)
 #biom.dat<-as.data.frame(t(biom.data))
 #write.csv(biom.dat, "biom.dat.csv", row.names=F)
 
-w_fw<-readRDS("weighted_foodwebs.rds")
+w_fw<-readRDS("../Data/weighted_foodwebs.rds")
 
 #biomass data yearly
 biom.data<-read.csv("biom.dat.csv")
