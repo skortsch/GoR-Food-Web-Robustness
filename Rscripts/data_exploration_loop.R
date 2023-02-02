@@ -1,9 +1,11 @@
 
 #data exploration loop
-
+setwd("D:/R_Git/GoR-Food-webs/Rscripts")
 w_fw<-readRDS("../Data/weighted_foodwebs.rds")
 
+library(igraph)
 
+par(mfrow=c(4,2))
 for(i in 1:length(w_fw)){
   fw_i<-w_fw[[i]]
   
