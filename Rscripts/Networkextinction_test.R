@@ -1,9 +1,21 @@
-setwd("D:/R_Git/GoR-Food-webs/Rscripts")
+### Triggering extinctions
+
+
+#Patrick's wd 
+#setwd("D:/R_Git/GoR-Food-webs/Rscripts")
+
+#susanne's wd
+setwd("C:/LocalData/susakort/GitHub/GoR-Food-webs/Rscripts")
 
 w_fw<-readRDS("../Data/weighted_foodwebs.rds")
 
-load("D:/R_Git/GoR-Food-webs/Data/uw_fw_GOR.RData")
-load("D:/R_Git/GoR-Food-webs/Data/w_fw_GOR.RData")
+#load("D:/R_Git/GoR-Food-webs/Data/uw_fw_GOR.RData")
+#load("D:/R_Git/GoR-Food-webs/Data/w_fw_GOR.RData")
+
+#load GoR data
+load("../Data/uw_fw_GOR.RData")
+load("../Data/w_fw_GOR.RData")
+load("../Data/metawebs_GoR.RData")
               
 library(NetworkExtinction)
 library(network)
@@ -11,7 +23,6 @@ library(igraph)
 
 data("net")
 SimulateExtinctions(Network = net, Method = "Mostconnected")#exemple, fungerar
-
 
 #annat exempel network
 data("chilean_intertidal")
@@ -26,7 +37,35 @@ Mostconnected <- SimulateExtinctions(Network = chilean_intertidal,
 Mostconnected$sims
 as.matrix(chilean_intertidal)
 
-SimulateExtinctions(fw.1981, Method = "Mostconnected")# fungerar inte -->crash, fatal error
+#w_mw
+load("../Data/metawebs_GoR.RData")
+w_mw<-as.matrix(w_mw)
+rownames(w_mw)<-c(1:dim(w_mw)[1])
+colnames(w_mw)<-c(1:dim(w_mw)[1])
+w_mw<-as.network(w_mw)
+
+#unweighted metaweb GoR
+un_mw<-as.matrix(un_mw)
+rownames(un_mw)<-c(1:dim(un_mw)[1])
+colnames(un_mw)<-c(1:dim(un_mw)[1])
+un_mw<-as.network(un_mw)
+un_mw<-as.network.matrix(un_mw,matrix.type="adjacency")
+SimulateExtinctions(un_mw, NetworkType = "Trophic", Method = "Mostconnected")# fungerar inte -->crash, fatal error
+
+Network<-un_mw
+Network<-w_mw
+#Network<-net
+Network <- .DataInit(x = Network)
+#if (!NetworkType %in% c("Trophic", "Mutualistic")) {
+#  stop("Please specify NetworkType as either 'Trophic' or 'Mutualistic'")
+edgelist <- network::as.matrix.network.edgelist(Network, matrix.type = "edgelist")
+Grado <- NULL
+Conected <- data.frame(ID = 1:network::network.size(Network), Grado = sna::degree(edgelist, c("total")))
+Conected <- dplyr::arrange(Conected, desc(Grado))$ID
+DF <- ExtinctionOrder(Network = Network, Order = Conected, NetworkType = "Trophic")
+#weighted network
+DF <- ExtinctionOrder(Network = Network, Order = Conected, NetworkType = "Trophic")
+
 
 #nyt format?
 test81<-as.network(fw.1981)
