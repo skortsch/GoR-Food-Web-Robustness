@@ -43,6 +43,8 @@ w_mw<-as.matrix(w_mw)
 rownames(w_mw)<-c(1:dim(w_mw)[1])
 colnames(w_mw)<-c(1:dim(w_mw)[1])
 w_mw<-as.network(w_mw)
+as.network.matrix(w_mw,matrix.type="adjacency")
+
 
 #unweighted metaweb GoR
 un_mw<-as.matrix(un_mw)
@@ -64,7 +66,7 @@ Conected <- data.frame(ID = 1:network::network.size(Network), Grado = sna::degre
 Conected <- dplyr::arrange(Conected, desc(Grado))$ID
 DF <- ExtinctionOrder(Network = Network, Order = Conected, NetworkType = "Trophic")
 #weighted network
-DF <- ExtinctionOrder(Network = Network, Order = Conected, NetworkType = "Trophic")
+DF <- ExtinctionOrder(Network = Network, Order = Conected, NetworkType = "Trophic", IS = 0.5)
 
 
 #nyt format?
