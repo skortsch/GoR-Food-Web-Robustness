@@ -7,6 +7,7 @@ w.top.roles<-readRDS("../Data/w.top.roles.RDS")
 library(NetworkExtinction)
 library(network)
 library(igraph)
+library(RColorBrewer)
 
 #test/ proof of concept code
 #fw.1981<-uw_fw[[1]]
@@ -403,14 +404,14 @@ axis(1, at=1:7, labels= year2[1:7])
     #fw_i<-graph.adjacency(fw_i, mode="directed", weighted=T)
     #fw_i<-as.matrix(fw_i, matrix.type = "adjacency", attr= "weight", sparse= F)
     #fw_i<-as.network(fw_i, matrix.type = "adjacency", attrnames= "weight",names.eval = "weight", ignore.eval=FALSE)
-    sum.link.extinc<-ExtinctionOrder(fw_i, order_sum_link[1:12], NetworkType = "Trophic", IS=0.3)
+    sum.link.extinc<-ExtinctionOrder(fw_i, order_sum_link, NetworkType = "Trophic", IS=0.3)
     extinc.plots[i]<-sum.link.extinc
     
     #R50
     dim(fw_i)[1]/2
     R50sum.link.weight[i]<-length(which(sum.link.extinc$sims$TotalExt<  dim(fw_i)[1]/2))
     #ExtinctionPlot(History = extinc.plots) # can work in loop with list 
-    year<-c("w1981 sum.lw, TH 30%", "w1986 sum.lw, Treshold 30%", "w1991 sum.lw, TH 30%", "w1996 sum.lw, TH 30%",
+    year<-c("w1981 sum.lw, TH 30%", "w1986 sum.lw, Treshold 30%", "w1991 sum.lw, TH 30%", "w1996 sum.lw, 30%",
             "w2001 sum.lw, TH 30%", "w2006 sum.lw, TH 30%", "w2011 sum.lw, TH 30%")
     plot(extinc.plots[[i]]$NumExt, extinc.plots[[i]]$AccSecExt, type = "l",main = year[i],
          xlab="Number of extinctions", ylab="Accumulated Secondary Extinctions", ylim = c(0,34), xlim = c(0,34))
@@ -521,4 +522,159 @@ axis(1, at=1:7, labels= year2[1:7])
   year2<-c("1981", "1986", "1991", "1996", "2001", "2006", "2011")
   axis(1, at=1:7, labels= year2[1:7]) 
 }
+
+
+#loop for all years, TH 30%
+{
+  R50sum.link.weight<-list()
+  R50index<-list()
+  extinc.plots<-list()
+  #par(mfrow=c(4,2))
+  for(i in 1:length(w_fw)){
+    #y<-graph_from_adjacency_matrix(w_fw[[4]], weighted = T, mode = "directed")
+    #fw_i<-as.matrix(y,  matrix.type = "adjacency", attr= "weight", sparse= F)
+    fw_i<-w_fw[[i]]
+    sp<-colnames(w_fw[[i]])
+    a<-dim(fw_i)
+    colnames(fw_i)<-c(1:a[1]) # remove node names so extinction function can run
+    rownames(fw_i)<-c(1:a[1])
+    
+    fw<-graph_from_adjacency_matrix(
+      fw_i,
+      mode = c("directed"),
+      weighted = TRUE,
+    )
+    sum.link.weights.sp<-apply(fw_i, 1, sum)+apply(fw_i, 2, sum)
+    
+    order_sum_link<-as.numeric(names(sort(sum.link.weights.sp, decreasing = T)))
+    
+     #what species go extinct
+     b<-sort(`names<-`(sum.link.weights.sp, sp), decreasing = T)
+     b<-names(b)
+     remove2<-c("Autotroph", "Mixotroph", "Detritus")
+     b<-setdiff(b, remove2)
+    
+    #remove basal nodes from extinction order: autotrophs=2, mixotrophs=3, detritus=which(colnames(w_fw[[i]])=="Detritus"))
+    remove<-c(2,3,which(colnames(w_fw[[i]])=="Detritus"))
+    order_sum_link<-setdiff(order_sum_link, remove)
+    
+    sum.link.extinc<-ExtinctionOrder(fw_i, order_sum_link, NetworkType = "Trophic", IS=0.3) #0.3 leads to removal of all nodes which lose 70 percent of their interaction strength in the Network argument)
+    extinc.plots[[i]]<-sum.link.extinc
+    R50index[i]<-sum.link.extinc$R50
+    #ExtinctionPlot(History=extinc.plots[[i]]$sims, Variable = "AccSecExt")
+    #R50
+    R50sum.link.weight[[i]]<-length(which(sum.link.extinc$sims$TotalExt<  dim(fw_i)[1]/2))
+  }
+  
+  year<-c("1981 ", "1986", "1991 ", "1996 ", "2001 ", "2006 ", "2011 ")
+  par(bg = "grey")
+  plot(extinc.plots[[1]]$sims$NumExt, extinc.plots[[1]]$sims$AccSecExt, type = "l",main = "Extinction by sum.link.weigth, loss of 70% incoming flow = extinction",
+       xlab="Number of primary extinctions", ylab="Secondary Extinctions", ylim = c(0,20), xlim = c(0,20))
+  #abline(v= R50multiTH)
+  #legend("topleft", inset = 0.1, legend= R50.WMW, title = "R50=", box.lty = 0)
+  #legend("right", legend =  b[1:R50.WMW], title = "Extinction order:", box.lty = 0)
+  #plotcol <- c("red","blue","steelblue","black", "cyan3","orange","purple")
+  plotcol<-brewer.pal(name = "Spectral", n=length(extinc.plots))
+  for (j in 1:length(extinc.plots)){
+    lines(extinc.plots[[j]]$sims$NumExt, extinc.plots[[j]]$sims$AccSecExt, col=plotcol[j], lwd=2)
+    points(x=extinc.plots[[j]]$sims$NumExt, y=extinc.plots[[j]]$sims$AccSecExt, col=plotcol[j], pch=15, type = "p")
+    # abline(v= R50multiTH[j], col=j)
+   
+  }
+  legend("bottomright", legend= R50sum.link.weight, title = "Nr prim.ext. R50", col = plotcol, pch = 15)
+  legend("topright", legend = year, title = "Year", col = plotcol, pch = 15)
+  legend("topleft", legend= R50index, title = "R50", col = plotcol, pch = 15)
+  #legend("topright", legend = TH*100, title = "% left of incoming flow
+  #     required to trigger extinction", col = plotcol, pch = 15, box.lty = 0)
+  
+}
+
+plot(extinc.plots[[1]]$sims$NumExt, extinc.plots[[1]]$sims$AccSecExt, type = "l",main = "Extinction by sum.link.weigth, loss of 70% incoming flow = extinction",
+     xlab="Number of primary extinctions", ylab="Secondary Extinctions", ylim = c(0,16), xlim = c(0,16))
+lines(extinc.plots[[1]]$sims$NumExt, extinc.plots[[1]]$sims$AccSecExt, col=plotcol[1], lwd=2)
+lines(extinc.plots[[7]]$sims$NumExt, extinc.plots[[7]]$sims$AccSecExt, col=plotcol[7], lwd=2)
+points(x=extinc.plots[[7]]$sims$NumExt, y=extinc.plots[[7]]$sims$AccSecExt, col=plotcol[7], pch=15, type = "p")
+points(x=extinc.plots[[1]]$sims$NumExt, y=extinc.plots[[1]]$sims$AccSecExt, col=plotcol[1], pch=15, type = "p")
+legend("bottomright", legend= R50sum.link.weight[c(1,7)], title = "Nr of primary extinctions to reach R50", col = plotcol[c(1,7)], pch = 15)
+legend("topright", legend = year[c(1,7)], title = "Year", col = plotcol[c(1,7)], pch = 15)
+legend("topleft", legend= R50index[c(1,7)], title = "R50", col = plotcol[c(1,7)], pch = 15)
+
+
+
+
+
+
+{
+  R50sum.link.weight<-list()
+  R50index<-list()
+  extinc.plots<-list()
+  #par(mfrow=c(4,2))
+  for(i in 1:length(w_fw)){
+    #y<-graph_from_adjacency_matrix(w_fw[[4]], weighted = T, mode = "directed")
+    #fw_i<-as.matrix(y,  matrix.type = "adjacency", attr= "weight", sparse= F)
+    fw_i<-w_fw[[i]]
+    sp<-colnames(w_fw[[i]])
+    a<-dim(fw_i)
+    colnames(fw_i)<-c(1:a[1]) # remove node names so extinction function can run
+    rownames(fw_i)<-c(1:a[1])
+    
+    fw<-graph_from_adjacency_matrix(
+      fw_i,
+      mode = c("directed"),
+      weighted = TRUE,
+    )
+    sum.link.weights.sp<-apply(fw_i, 1, sum)+apply(fw_i, 2, sum)
+    
+    order_sum_link<-as.numeric(names(sort(sum.link.weights.sp, decreasing = T)))
+    
+    #what species go extinct
+    b<-sort(`names<-`(sum.link.weights.sp, sp), decreasing = T)
+    b<-names(b)
+    remove2<-c("Autotroph", "Mixotroph", "Detritus")
+    b<-setdiff(b, remove2)
+    
+    #remove basal nodes from extinction order: autotrophs=2, mixotrophs=3, detritus=which(colnames(w_fw[[i]])=="Detritus"))
+    remove<-c(2,3,which(colnames(w_fw[[i]])=="Detritus"))
+    order_sum_link<-setdiff(order_sum_link, remove)
+    
+    sum.link.extinc<-ExtinctionOrder(fw_i, order_sum_link, NetworkType = "Trophic", IS=0.1) #0.3 leads to removal of all nodes which lose 70 percent of their interaction strength in the Network argument)
+    extinc.plots[[i]]<-sum.link.extinc
+    R50index[i]<-sum.link.extinc$R50
+    #ExtinctionPlot(History=extinc.plots[[i]]$sims, Variable = "AccSecExt")
+    #R50
+    R50sum.link.weight[[i]]<-length(which(sum.link.extinc$sims$TotalExt<  dim(fw_i)[1]/2))
+  }
+  
+  year<-c("1981 ", "1986", "1991 ", "1996 ", "2001 ", "2006 ", "2011 ")
+  par(bg = "grey")
+  plot(extinc.plots[[1]]$sims$NumExt, extinc.plots[[1]]$sims$AccSecExt, type = "l",main = "Extinction by sum.link.weigth, loss of 90% incoming flow = extinction",
+       xlab="Number of primary extinctions", ylab="Secondary Extinctions", ylim = c(0,20), xlim = c(0,20))
+  #abline(v= R50multiTH)
+  #legend("topleft", inset = 0.1, legend= R50.WMW, title = "R50=", box.lty = 0)
+  #legend("right", legend =  b[1:R50.WMW], title = "Extinction order:", box.lty = 0)
+  #plotcol <- c("red","blue","steelblue","black", "cyan3","orange","purple")
+  plotcol<-brewer.pal(name = "Spectral", n=length(extinc.plots))
+  for (j in 1:length(extinc.plots)){
+    lines(extinc.plots[[j]]$sims$NumExt, extinc.plots[[j]]$sims$AccSecExt, col=plotcol[j], lwd=2)
+    points(x=extinc.plots[[j]]$sims$NumExt, y=extinc.plots[[j]]$sims$AccSecExt, col=plotcol[j], pch=15, type = "p")
+    # abline(v= R50multiTH[j], col=j)
+    
+  }
+  legend("bottomright", legend= R50sum.link.weight, title = "Nr of prim.ext.R50", col = plotcol, pch = 15)
+  legend("topright", legend = year, title = "Year", col = plotcol, pch = 15)
+  legend("topleft", legend= R50index, title = "R50", col = plotcol, pch = 15)
+  #legend("topright", legend = TH*100, title = "% left of incoming flow
+  #     required to trigger extinction", col = plotcol, pch = 15, box.lty = 0)
+  
+}
+
+plot(extinc.plots[[1]]$sims$NumExt, extinc.plots[[1]]$sims$AccSecExt, type = "l",main = "Extinction by sum.link.weigth, loss of % incoming flow = extinction",
+     xlab="Number of primary extinctions", ylab="Secondary Extinctions", ylim = c(0,16), xlim = c(0,16))
+lines(extinc.plots[[1]]$sims$NumExt, extinc.plots[[1]]$sims$AccSecExt, col=plotcol[1], lwd=2)
+lines(extinc.plots[[7]]$sims$NumExt, extinc.plots[[7]]$sims$AccSecExt, col=plotcol[7], lwd=2)
+points(x=extinc.plots[[7]]$sims$NumExt, y=extinc.plots[[7]]$sims$AccSecExt, col=plotcol[7], pch=15, type = "p")
+points(x=extinc.plots[[1]]$sims$NumExt, y=extinc.plots[[1]]$sims$AccSecExt, col=plotcol[1], pch=15, type = "p")
+legend("bottomright", legend= R50sum.link.weight[c(1,7)], title = "Nr of primary extinctions to reach R50", col = plotcol[c(1,7)], pch = 15)
+legend("topright", legend = year[c(1,7)], title = "Year", col = plotcol[c(1,7)], pch = 15)
+legend("topleft", legend= R50index[c(1,7)], title = "R50", col = plotcol[c(1,7)], pch = 15)
 
