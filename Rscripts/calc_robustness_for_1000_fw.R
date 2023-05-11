@@ -17,6 +17,8 @@ load("w_fw_GoR.RData")
 
 index<-matrix(NA, 34, 1000)
 
+index.arr <- list() #could be list of output for the 1000 food webs per year
+
 for (i in 1:1000){
   #i<-1
   sp.pa.year<-1*((t(biomC[,,i])[, match(row.names(un_mw), row.names(biomC[,,1]))])>0) #reorder to use for making networks (1000 per year)
@@ -42,8 +44,18 @@ for (i in 1:1000){
 
 index.median<- apply(index, 1, median)
 
+#To make the array
+years<-34
+dim.index<-5
+no.fw<-1000
 
+arr <- array(unlist(index), dim = c(years, dim.index, no.fw))
+dimnames(arr) <- list(dimnames(biomC)[[2]],
+                      colnames(dim.index), 
+                      1:dim(biomC)[3])
 
+#calc median value of array
+apply(arr, 1:2, median, na.rm = TRUE)
 
 
 
