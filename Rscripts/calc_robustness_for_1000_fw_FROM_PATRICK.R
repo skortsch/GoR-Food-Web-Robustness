@@ -103,7 +103,7 @@ extinctionoutput
 
 #fluxweb
 
-w.webs.1000<-list()
+w.webs.1000<-list() #list with 1000 foodwebs of which each contains 34, one per year
 
 for (i in 1:10){
  
