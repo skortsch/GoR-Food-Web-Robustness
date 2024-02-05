@@ -1,0 +1,5 @@
+"S" "L" "LD" "C" "Clust" "Mod" "PercOmni" "Omni" "PredPrey" "Can" "Bas" "Top" "Int" "GenSD" "VulSD" "meanSWTL" "meanPath"
+"SB" NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
+"PB" NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
+"BS" NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
+"BB" NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
