@@ -139,6 +139,7 @@ for (i in 1:10){
   }
 
 
+w.webs.1000[[10]][[34]] 
 
 #examples from Susanne
 
