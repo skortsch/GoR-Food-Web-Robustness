@@ -488,7 +488,7 @@ for (i in 1:1000){
   a<-webs[[i]]
   
   for (j in 1:34) {
-    fw<-a[[i]]
+    fw<-a[[j]]
     
     fw_i<-fw
     colnames(fw_i)<-c(1:dim(fw)[1])# changes node names to numbers so extinction function can run, cold not run with species names
