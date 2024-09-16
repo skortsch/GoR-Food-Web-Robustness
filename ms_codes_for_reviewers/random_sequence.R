@@ -1,4 +1,8 @@
+####### RANDOM DELETION SEQUENCES #######
+
 #For reviewers
+
+#Script for reviewers of the ms "Food web robustness depends on network type and threshold for extinction"
 
 ####READ ME####
 #This file contains the script to produce the results
