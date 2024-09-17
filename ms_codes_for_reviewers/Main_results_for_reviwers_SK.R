@@ -9,6 +9,9 @@
 #For the code for the other deletion sequences presented in the SI of the manuscript
 #see the other two scripts, "Low_to_high_sequence.R" and "random_sequence.R"
 
+#
+setwd("C:/LocalData/susakort/GitHub/GoR-Food-webs/ms_codes_for_reviewers")
+
 #### packages ####
 
 install.packages(c("igraph", "ggplot2","MASS", "NetIndecies", "fluxweb", "NetworkExtinctions",
