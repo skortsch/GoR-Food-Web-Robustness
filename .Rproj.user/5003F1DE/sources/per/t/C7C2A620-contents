@@ -1,0 +1,441 @@
+library(ggplot2)
+library(plyr)
+library(tidyverse)
+library(vroom)
+library(magrittr)
+library(gridExtra)
+library(smatr)
+
+
+##### merge and clean empirical and simulation data #####
+emp <- read_csv("Tes.csv") %>%
+  mutate(jaccard = pmap(list(S1, S2, num_shared_spec), function(x, y, z) {
+    z / (x + y - z)
+  }) %>%
+    unlist()) %>%
+  select(plot1, plot2, jaccard, Te, foodwebprop) %>%
+  rename(delta = Te) %>%
+  distinct_all() %>%
+  mutate(method = "empirical", web_type= "empirical")
+
+sims_full<- vroom("simulations.csv", delim = ",")
+sims_full$Tm<-as.numeric(sims_full$Tm)
+
+sims_full  %<>%
+  rename(delta = Tm,
+         method = filtering) %>%
+  select(-value_plot1, -value_plot2)
+
+sims_full %<>%
+  left_join(emp %>%
+              select(plot1, plot2, jaccard) %>%
+              distinct_all(),
+            by = c("plot1", "plot2"))
+
+sims_full<-bind_rows(sims_full,emp)
+
+sims_full %<>% 
+  mutate(sitename = modify(plot1,function(x){
+    if (grepl("lake|pond",x,ignore.case =T)) {
+      "Adirondack lakes"
+    } else {
+      "Biodiversity Exploritory soil food webs"
+    }
+  }
+    ))
+
+vroom_write(sims_full, "full_data.csv", delim=",")
+
+data_full<-vroom("full_data.csv", delim = ",")
+data_full<-data_full[-which(data_full$delta >20),]
+df<-transform(data_full, z_score=ave(delta, foodwebprop, FUN=scale))
+vroom_write(df, "full_data_scale.csv", delim=",")
+
+data_full_scale<-vroom("full_data_scale.csv", delim = ",")
+data_full_scale <- filter(data_full_scale, foodwebprop != "species_richness", foodwebprop != "frCB")
+data_full_scale_filter <- data_full_scale %>% 
+  mutate(x = scale(1-jaccard))
+
+#write.table(data_full_scale_mean,"data_full_scale_mean.txt", sep=",", row.names=F)
+data_full_scale_mean<-vroom("data_full_scale_mean.txt", delim = ",")
+
+####### plot simulations + empirical scatter/hex ######
+for (i in c("clust","connectance","CPL","fAC","fIGPs","frB","fRC","frI","frOmn","frT","fTC","maxTL","meanTL","sdTL","meanSim","sdGen","sdVul"))
+{
+g1<- ggplot(filter(data_full_scale_filter, foodwebprop==i),aes(x=x,y=z_score)) + 
+  #geom_point(size=0.1,alpha=0.1) +
+  geom_hex(aes(fill=..density..),bins = 50) +
+  scale_fill_continuous(type = "viridis", trans="log10") +
+  facet_grid(sitename~method*web_type, scales="fixed") +
+  geom_smooth(color="red", size=1, method="lm") +
+  coord_cartesian(ylim=c(-2,10)) +
+  ggtitle(i) +
+  theme_classic()
+
+g2<- ggplot(filter(data_full_scale_filter, foodwebprop==i),aes(x=x,y=z_score)) + 
+  geom_point(size=0.2,alpha=0.2) +
+  #geom_hex(aes(fill=..density..),bins = 50) +
+  #scale_fill_continuous(type = "viridis", trans="log10") +
+  facet_grid(sitename~method*web_type, scales="fixed") +
+  geom_smooth(color="red", size=1, method="lm") +
+  coord_cartesian(ylim=c(-2,10)) +
+  ggtitle(i) +
+  theme_classic()+xlab("scaled species dissimilarity") + ylab("scaled foodweb dissimilarity")
+  png(paste("plots/LM_z-scores_density_",i,".png",sep=""),width = 1000, height = 1000)
+  print(g1)
+  dev.off()
+  png(paste("plots/LM_z-scores_scatter_",i,".png",sep=""),width = 1000, height = 1000)
+  print(g2)
+  dev.off()
+}
+
+for (j in c("Adirondack lakes", "Biodiversity Exploritory soil food webs"))
+  {
+    for ( i in c("random","niche"))
+    {
+            
+  g1<- ggplot(filter(data_full_scale_mean,method=="empirical" & sitename==j),aes(x=x,y=fw_dissimilarity)) + 
+    #geom_point(size=0.1,alpha=0.1) +
+    ggtitle(paste("empirical -",j,sep="")) +
+    #facet_grid(~sitename, scales="free") +
+    geom_hex(aes(fill=..density..),bins = 50) +
+    scale_fill_continuous(type = "viridis", trans="log10") +
+    geom_smooth(color="red", size=2, method="lm") +
+    coord_cartesian(ylim=c(-2,5),xlim=c(-3,3)) +
+    theme_classic()+xlab("scaled species dissimilarity") + ylab("scaled foodweb dissimilarity")
+  
+  g2<- ggplot(filter(data_full_scale_mean,method=="no filtering" & sitename==j & web_type==i),aes(x=x,y=fw_dissimilarity)) + 
+    #geom_point(size=0.1,alpha=0.1) +
+    ggtitle(paste(i,"-no filtering -",j,sep="")) +
+    #facet_grid(~sitename, scales="free") +
+    geom_hex(aes(fill=..density..),bins = 50) +
+    scale_fill_continuous(type = "viridis", trans="log10") +
+    geom_smooth(color="red", size=2, method="lm") +
+    coord_cartesian(ylim=c(-2,5),xlim=c(-3,3)) +
+    theme_classic()+xlab("scaled species dissimilarity") + ylab("scaled foodweb dissimilarity")
+  
+  g3<- ggplot(filter(data_full_scale_mean,method=="biotic filtering" & sitename==j & web_type==i),aes(x=x,y=fw_dissimilarity)) + 
+    #geom_point(size=0.1,alpha=0.1) +
+    ggtitle(paste(i,"-biotic filtering -",j,sep="")) +
+    #facet_grid(~sitename, scales="free") +
+    geom_hex(aes(fill=..density..),bins = 50) +
+    scale_fill_continuous(type = "viridis", trans="log10") +
+    geom_smooth(color="red", size=2, method="lm") +
+    coord_cartesian(ylim=c(-2,5),xlim=c(-3,3)) +
+    theme_classic()+xlab("scaled species dissimilarity") + ylab("scaled foodweb dissimilarity")
+  
+  g4<- ggplot(filter(data_full_scale_mean,method=="limiting similarity" & sitename==j & web_type==i),aes(x=x,y=fw_dissimilarity)) + 
+    #geom_point(size=0.1,alpha=0.1) +
+    ggtitle(paste(i,"-limiting similarity -",j,sep="")) +
+    #facet_grid(~sitename, scales="free") +
+    geom_hex(aes(fill=..density..),bins = 50) +
+    scale_fill_continuous(type = "viridis", trans="log10") +
+    geom_smooth(color="red", size=2, method="lm") +
+    coord_cartesian(ylim=c(-2,5),xlim=c(-3,3)) +
+    theme_classic()+xlab("scaled species dissimilarity") + ylab("scaled foodweb dissimilarity")
+  
+  
+  g5<- ggplot(filter(data_full_scale_mean,method=="empirical" & sitename==j),aes(x=x,y=fw_dissimilarity)) + 
+    #geom_point(size=0.1,alpha=0.1) +
+    ggtitle(paste("empirical -",j,sep="")) +
+    #facet_grid(~sitename, scales="free") +
+    geom_point(alpha=0.2, size=1) +
+    #scale_fill_continuous(type = "viridis", trans="log10") +
+    geom_smooth(color="red", size=1, method="lm") +
+    coord_cartesian(ylim=c(-1,3),xlim=c(-3,3)) +
+    theme_classic()+xlab("scaled species dissimilarity") + ylab("scaled foodweb dissimilarity")
+  
+  g6<- ggplot(filter(data_full_scale_mean,method=="empirical" & sitename==j),aes(x=1-jaccard,y=fw_dissimilarity)) + 
+    #geom_point(size=0.1,alpha=0.1) +
+    ggtitle(paste("empirical -",j,sep="")) +
+    #facet_grid(~sitename, scales="free") +
+    geom_hex(aes(fill=..density..),bins = 50) +
+    scale_fill_continuous(type = "viridis", trans="log10") +
+    geom_smooth(color="red", size=1, method="lm") +
+    coord_cartesian(ylim=c(-1,3),xlim=c(0.5,0.9)) +
+    theme_classic()+xlab("species dissimilarity") + ylab("scaled foodweb dissimilarity")
+  
+  if (j=="Adirondack lakes") {
+    colvec<-"#1a5f86"
+  } else {
+    colvec<-"#be6601"
+  }
+
+  g7<- ggplot(filter(data_full_scale_mean,method=="empirical" & sitename==j),aes(x=1-jaccard,y=fw_dissimilarity)) + 
+    #geom_point(size=0.1,alpha=0.1) +
+    ggtitle(paste("empirical -",j,sep="")) +
+    #facet_grid(~sitename, scales="free") +
+    geom_point(alpha=0.2, size=1, col=colvec) +
+    #geom_point(alpha=0.2, size=1, col="#be6601") +
+    #scale_fill_continuous(type = "viridis", trans="log10") +
+    geom_smooth(color="red", size=1, method="lm") +
+    coord_cartesian(ylim=c(-1,3),xlim=c(0.5,0.9)) +
+    theme_classic()+xlab("species dissimilarity") + ylab("scaled foodweb dissimilarity")
+  
+  png(paste("plots/Test_mean_",j,"-",i,".png",sep=""),width = 1000, height = 1000)
+  grid.arrange(g1,g2,g3,g4, ncol=2)
+  dev.off()
+  pdf(paste("plots/Test_density_",j,"-",i,".pdf",sep=""),width = 6, height = 6)
+  print(g1)
+  dev.off()
+  pdf(paste("plots/Test_scatter_",j,"-",i,".pdf",sep=""),width = 6, height = 6)
+  print(g5)
+  dev.off()
+  pdf(paste("plots/Test_density_nonscaled",j,"-",i,".pdf",sep=""),width = 6, height = 6)
+  print(g6)
+  dev.off()
+  pdf(paste("plots/Test_scatter_nonscaled",j,".pdf",sep=""),width = 6, height = 6)
+  print(g7)
+  dev.off()
+  
+  }}
+  
+
+### pooled fw structures
+
+data_full_scale<-vroom("full_data_scale.csv", delim = ",")
+data_full_scale <- filter(data_full_scale, foodwebprop != "species_richness", foodwebprop != "frCB",method != "filtering")
+data_full_scale_filter <- data_full_scale %>% 
+  mutate(x = scale(1-jaccard))
+data_full_scale_mean<-vroom("data_full_scale_mean.txt", delim = ",")
+pdf("plots/lm_pooled_mean.pdf",height= 5, width = 5, onefile = T)  ### add size
+
+effect.sizes.pooled<-data.frame()
+
+for (i in c("Adirondack lakes", "Biodiversity Exploritory soil food webs"))
+{
+  for (j in c("random","niche"))
+  {
+    lakes<-filter(data_full_scale_mean,method=="empirical", sitename==i)
+    
+    lm_lake <- sma(fw_dissimilarity~as.vector(x),data=lakes)  
+  
+    emp_pred <-predict(lm_lake, newdata=data.frame(x=lakes$x))
+    lm_lake$coef[[1]]$`coef(SMA)`[1] #intercept
+    lm_lake$coef[[1]]$`coef(SMA)`[2] #slope
+    emp_pred <-cbind(emp_pred,lakes)
+    names(emp_pred)[1]<-"pred"
+    emp_pred  %<>% mutate(resid=fw_dissimilarity-pred)
+    
+    lake_niche_no_filter<-filter(data_full_scale_mean,method=="no filtering", sitename==i, web_type ==j)
+    lake_niche_bio_filter<-filter(data_full_scale_mean,method=="biotic filtering", sitename==i, web_type ==j)
+    lake_niche_similarity_filter<-filter(data_full_scale_mean,method=="limiting similarity", sitename==i, web_type ==j)
+    
+    coeffs<-as.data.frame(rbind(stats_emp,stats_no_filter,stats_biotic_filter,stats_similarity_filter))
+    effect.sizes.pooled<-rbind(effect.sizes.pooled,coeffs)
+    
+    lake_pred_no_filter<-predict(lm_lake, newdata=data.frame(x=lake_niche_no_filter$x))
+    lake_pred_no_filter <-cbind(lake_pred_no_filter,lake_niche_no_filter)
+    names(lake_pred_no_filter)[1]<-"pred"
+    lake_pred_no_filter  %<>% mutate(resid=fw_dissimilarity-pred)
+    
+    lake_pred_bio_filter<-predict(lm_lake, newdata=data.frame(x=lake_niche_bio_filter$x))
+    lake_pred_bio_filter <-cbind(lake_pred_bio_filter,lake_niche_bio_filter)
+    names(lake_pred_bio_filter)[1]<-"pred"
+    lake_pred_bio_filter  %<>% mutate(resid=fw_dissimilarity-pred)
+    
+    lake_pred_similarity_filter<-predict(lm_lake, newdata=data.frame(x=lake_niche_similarity_filter$x))
+    lake_pred_similarity_filter <-cbind(lake_pred_similarity_filter,lake_niche_similarity_filter)
+    names(lake_pred_similarity_filter)[1]<-"pred"
+    lake_pred_similarity_filter  %<>% mutate(resid=fw_dissimilarity-pred)
+    
+    full<-rbind(emp_pred,lake_pred_no_filter,lake_pred_bio_filter,lake_pred_similarity_filter)
+    
+    g1<-ggplot(data=full, aes(x=resid, color=method,fill=method)) + geom_density(alpha=0.2) + theme_classic() +
+    ggtitle(paste(i,"-",j,"-averaged",sep="")) +xlab("prediction residuals") + ylab("density") +
+      theme(axis.text=element_text(size=8),
+            axis.title=element_text(size=8)) + 
+      theme(legend.text=element_text(size=8)) +
+      theme(plot.title = element_text(size = 10, face = "bold"))
+    write_rds(g1, paste("plots/pooled_residuals-",j,"-",i,".rds"))
+    print(g1)
+  }}
+dev.off()
+
+write.table(effect.sizes.pooled, "effect_sizes_pooled_mean.txt", sep=",",row.names=F)
+
+#### FW structures individual
+effect.sizes<-data.frame()
+pdf("plots/lm_FWindividual.pdf",height= 5, width = 5, onefile = T)  ### add size
+for (i in c("Adirondack lakes", "Biodiversity Exploritory soil food webs"))
+{
+  for (j in c("random","niche"))
+  {
+    for (k in c("clust","connectance","CPL","fAC","fIGPs","frB","fRC","frI","frOmn","frT","fTC","maxTL","meanTL","sdTL","meanSim","sdGen","sdVul"))
+    #for (k in c("meanTL","sdTL"))
+    {
+      lakes<-filter(data_full_scale_filter,method=="empirical", sitename==i,foodwebprop==k)
+      
+
+      lm_lake <- lm(z_score~as.vector(x),data=lakes)
+      
+      emp_pred <-predict(lm_lake, newdata=data.frame(x=lakes$x))
+      emp_pred <-cbind(emp_pred,lakes)
+      names(emp_pred)[1]<-"pred"
+      emp_pred  %<>% mutate(resid=z_score-pred)
+      
+      lake_niche_no_filter<-filter(data_full_scale_filter,method=="no filtering", sitename==i, web_type ==j,foodwebprop==k)
+      lake_niche_bio_filter<-filter(data_full_scale_filter,method=="biotic filtering", sitename==i, web_type ==j,foodwebprop==k)
+      lake_niche_similarity_filter<-filter(data_full_scale_filter,method=="limiting similarity", sitename==i, web_type ==j,foodwebprop==k)
+      
+      lm_emp <- lm(z_score~x,data=lakes) 
+      lm_no_filter <- lm(z_score~x,data=lake_niche_no_filter) 
+      lm_biotic_filter <- lm(z_score~x,data=lake_niche_bio_filter) 
+      lm_similarity_filter <- lm(z_score~x,data=lake_niche_similarity_filter) 
+      
+      stats_emp<-lm_emp %>%
+        broom::tidy() %>%
+        mutate(df = length(lakes$x) - 2,
+               `Cohen's d` = statistic / sqrt(df), Biome=c(i,i), model= c(j,j), method="empirical", fw.structure=c(k,k)) 
+      stats_no_filter<-lm_no_filter %>%
+        broom::tidy() %>%
+        mutate(df = length(lake_niche_no_filter$x) - 2,
+               `Cohen's d` = statistic / sqrt(df), Biome=c(i,i), model= c(j,j), method="no_filtering", fw.structure=c(k,k)) 
+      stats_biotic_filter<-lm_biotic_filter %>%
+        broom::tidy() %>%
+        mutate(df = length(lake_niche_bio_filter$x) - 2,
+               `Cohen's d` = statistic / sqrt(df), Biome=c(i,i), model= c(j,j), method="biotic filtering", fw.structure=c(k,k)) 
+      stats_similarity_filter<-lm_similarity_filter %>%
+        broom::tidy() %>%
+        mutate(df = length(lake_niche_similarity_filter$x) - 2,
+               `Cohen's d` = statistic / sqrt(df), Biome=c(i,i), model= c(j,j), method="limiting similarity", fw.structure=c(k,k)) 
+      
+      coeffs<-as.data.frame(rbind(stats_emp,stats_no_filter,stats_biotic_filter,stats_similarity_filter))
+      effect.sizes<-rbind(effect.sizes,coeffs)
+      
+      
+      lake_pred_no_filter<-predict(lm_lake, newdata=data.frame(x=lake_niche_no_filter$x))
+      lake_pred_no_filter <-cbind(lake_pred_no_filter,lake_niche_no_filter)
+      names(lake_pred_no_filter)[1]<-"pred"
+      lake_pred_no_filter  %<>% mutate(resid=z_score-pred)
+      
+      lake_pred_bio_filter<-predict(lm_lake, newdata=data.frame(x=lake_niche_bio_filter$x))
+      lake_pred_bio_filter <-cbind(lake_pred_bio_filter,lake_niche_bio_filter)
+      names(lake_pred_bio_filter)[1]<-"pred"
+      lake_pred_bio_filter  %<>% mutate(resid=z_score-pred)
+      
+      lake_pred_similarity_filter<-predict(lm_lake, newdata=data.frame(x=lake_niche_similarity_filter$x))
+      lake_pred_similarity_filter <-cbind(lake_pred_similarity_filter,lake_niche_similarity_filter)
+      names(lake_pred_similarity_filter)[1]<-"pred"
+      lake_pred_similarity_filter  %<>% mutate(resid=z_score-pred)
+      
+      full<-rbind(emp_pred,lake_pred_no_filter,lake_pred_bio_filter,lake_pred_similarity_filter)
+      
+      g1<-ggplot(data=full, aes(x=resid, color=method,fill=method)) + geom_density(alpha=0.2) + theme_classic() +
+      ggtitle(paste(i,"-",j,"-",k,sep="")) +xlab("prediction residuals") + ylab("density")+
+        theme(axis.text=element_text(size=8),
+              axis.title=element_text(size=8)) + 
+        theme(legend.text=element_text(size=8)) +
+        theme(plot.title = element_text(size = 10, face = "bold"))
+      write_rds(g1, paste("plots/residuals-",j,"-",i,"-",k,".rds"))
+      
+      print(g1)
+    }}}
+write.table(effect.sizes, "effect_sizes_FWindividual.txt", sep=",", row.names=F)
+dev.off()
+
+
+###### save objects for Fig 3 as r.data  ######
+
+data_full_scale<-vroom("full_data_scale.csv", delim = ",")
+
+data_full_scale <- filter(data_full_scale, foodwebprop != "species_richness", foodwebprop != "frCB")
+data_full_scale_filter <- data_full_scale %>% 
+  mutate(x = scale(1-jaccard))
+
+data_full_scale_filter %<>%
+  filter(web_type!="random",method != "filtering", (foodwebprop == "connectance" | foodwebprop == "meanTL" | foodwebprop == "frT"| foodwebprop == "frB"| foodwebprop == "frI"))
+
+
+data_full_scale_mean<-vroom("data_full_scale_mean.txt", delim = ",")
+
+data_full_scale_mean %<>% 
+  filter(web_type!="random")
+
+
+
+for (i in c("Adirondack lakes", "Biodiversity Exploritory soil food webs"))
+{
+  for (j in c("niche"))
+  {
+    lakes<-filter(data_full_scale_mean,method=="empirical", sitename==i)
+    
+    lm_lake <- lm(fw_dissimilarity~as.vector(x),data=lakes)  
+    
+    emp_pred <-predict(lm_lake, newdata=data.frame(x=lakes$x))
+    emp_pred <-cbind(emp_pred,lakes)
+    names(emp_pred)[1]<-"pred"
+    emp_pred  %<>% mutate(resid=fw_dissimilarity-pred)
+    
+    lake_niche_no_filter<-filter(data_full_scale_mean,method=="no filtering", sitename==i)
+    lake_niche_bio_filter<-filter(data_full_scale_mean,method=="biotic filtering", sitename==i)
+    lake_niche_similarity_filter<-filter(data_full_scale_mean,method=="limiting similarity", sitename==i)
+    
+
+    lake_pred_no_filter<-predict(lm_lake, newdata=data.frame(x=lake_niche_no_filter$x))
+    lake_pred_no_filter <-cbind(lake_pred_no_filter,lake_niche_no_filter)
+    names(lake_pred_no_filter)[1]<-"pred"
+    lake_pred_no_filter  %<>% mutate(resid=fw_dissimilarity-pred)
+    
+    lake_pred_bio_filter<-predict(lm_lake, newdata=data.frame(x=lake_niche_bio_filter$x))
+    lake_pred_bio_filter <-cbind(lake_pred_bio_filter,lake_niche_bio_filter)
+    names(lake_pred_bio_filter)[1]<-"pred"
+    lake_pred_bio_filter  %<>% mutate(resid=fw_dissimilarity-pred)
+    
+    lake_pred_similarity_filter<-predict(lm_lake, newdata=data.frame(x=lake_niche_similarity_filter$x))
+    lake_pred_similarity_filter <-cbind(lake_pred_similarity_filter,lake_niche_similarity_filter)
+    names(lake_pred_similarity_filter)[1]<-"pred"
+    lake_pred_similarity_filter  %<>% mutate(resid=fw_dissimilarity-pred)
+    
+    full<-rbind(emp_pred,lake_pred_no_filter,lake_pred_bio_filter,lake_pred_similarity_filter)
+    
+    g1<-ggplot(data=full, aes(x=resid, color=method,fill=method)) + geom_density(alpha=0.2) + theme_classic() +
+      ggtitle(paste(i,"-",j,"-averaged",sep="")) +xlab("predicted residuals") + ylab("density")
+    
+    write_rds(g1,paste("plots/pooled_residuals-",j,"-",i,".rds"))
+  }}
+
+
+for (i in c("Adirondack lakes", "Biodiversity Exploritory soil food webs"))
+{
+  for (j in c("niche"))
+  {
+    for (k in c("connectance","frB","frI","frT","meanTL"))
+      
+    {
+      lakes<-filter(data_full_scale_filter,method=="empirical", sitename==i,foodwebprop==k)
+      
+      
+      lm_lake <- lm(z_score~as.vector(x),data=lakes)
+      
+      emp_pred <-predict(lm_lake, newdata=data.frame(x=lakes$x))
+      emp_pred <-cbind(emp_pred,lakes)
+      names(emp_pred)[1]<-"pred"
+      emp_pred  %<>% mutate(resid=z_score-pred)
+      
+      lake_niche_no_filter<-filter(data_full_scale_filter,method=="no filtering", sitename==i,foodwebprop==k)
+      lake_niche_bio_filter<-filter(data_full_scale_filter,method=="biotic filtering", sitename==i,foodwebprop==k)
+      lake_niche_similarity_filter<-filter(data_full_scale_filter,method=="limiting similarity", sitename==i,foodwebprop==k)
+      
+      lake_pred_no_filter<-predict(lm_lake, newdata=data.frame(x=lake_niche_no_filter$x))
+      lake_pred_no_filter <-cbind(lake_pred_no_filter,lake_niche_no_filter)
+      names(lake_pred_no_filter)[1]<-"pred"
+      lake_pred_no_filter  %<>% mutate(resid=z_score-pred)
+      
+      lake_pred_bio_filter<-predict(lm_lake, newdata=data.frame(x=lake_niche_bio_filter$x))
+      lake_pred_bio_filter <-cbind(lake_pred_bio_filter,lake_niche_bio_filter)
+      names(lake_pred_bio_filter)[1]<-"pred"
+      lake_pred_bio_filter  %<>% mutate(resid=z_score-pred)
+      
+      lake_pred_similarity_filter<-predict(lm_lake, newdata=data.frame(x=lake_niche_similarity_filter$x))
+      lake_pred_similarity_filter <-cbind(lake_pred_similarity_filter,lake_niche_similarity_filter)
+      names(lake_pred_similarity_filter)[1]<-"pred"
+      lake_pred_similarity_filter  %<>% mutate(resid=z_score-pred)
+      
+      full<-rbind(emp_pred,lake_pred_no_filter,lake_pred_bio_filter,lake_pred_similarity_filter)
+      
+      g1<-ggplot(data=full, aes(x=resid, color=method,fill=method)) + geom_density(alpha=0.2) + theme_classic() +
+        ggtitle(paste(i,"-",j,"-",k,sep="")) +xlab("predicted residuals") + ylab("density")
+      
+      write_rds(g1,paste("plots/residuals-",j,"-",i,"-",k,".rds"))
+    }}}

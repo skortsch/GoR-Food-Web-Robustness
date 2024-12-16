@@ -1,0 +1,76 @@
+source("SEM_PCA")
+
+# bootstrap --------------------------------------------------
+boot.total = 10000
+set.seed(50)
+
+mod.pval.soils = rep(NA, boot.total)
+coef.est.soils = matrix(NA, nrow=5, ncol=boot.total)
+coef.pval.soils = matrix(NA, nrow=5, ncol=boot.total)
+
+mod.pval.lakes = rep(NA, boot.total)
+coef.est.lakes = matrix(NA, nrow=5, ncol=boot.total)
+coef.pval.lakes = matrix(NA, nrow=5, ncol=boot.total)
+
+for(i in 1:boot.total){
+  
+  if(i%%10==0) print(i)
+  
+  # bootstrape sample  
+  n.boot = 48
+  id.boot = sample(1:nrow(dist.soils.std), n.boot) 
+  dist.soils.boot = dist.soils.std[id.boot, ]
+  
+  # sem model 1
+  sem.boot.soils = sem(formula.1, data=dist.soils.boot)
+  
+  mod.pval.soils[i] = fitMeasures(sem.boot.soils, "pvalue")
+  coef.pval.soils[, i] = parameterEstimates(sem.boot.soils)$pvalue[1:5]
+  coef.est.soils[, i]  = parameterEstimates(sem.boot.soils)$est[1:5]
+  
+  # bootstrape sample  
+  n.boot = 50
+  id.boot = sample(1:nrow(dist.lakes.std), n.boot) 
+  dist.lakes.boot = dist.lakes.std[id.boot, ]
+  
+  # sem model 1
+  sem.boot.lakes = sem(formula.1, data=dist.lakes.boot)
+  
+  mod.pval.lakes[i] = fitMeasures(sem.boot.lakes, "pvalue")
+  coef.pval.lakes[, i] = parameterEstimates(sem.boot.lakes)$pvalue[1:5]
+  coef.est.lakes[, i]  = parameterEstimates(sem.boot.lakes)$est[1:5]
+}
+
+sum(mod.pval.lakes>0.05)
+rowMeans(coef.est.lakes)
+rowSums(coef.est.lakes<0)/boot.total
+rowSums(coef.pval.lakes<0.05)/boot.total
+apply( coef.est.lakes, 1, function(x) quantile(x, probs=c(0.025, 0.975)) )
+
+sum(mod.pval.soils>0.05)
+rowMeans(coef.est.soils)
+rowSums(coef.est.soils<0)/boot.total
+rowSums(coef.pval.soils<0.05)/boot.total
+apply( coef.est.soils, 1, function(x) quantile(x, probs=c(0.025, 0.975)) )
+
+df=data.frame(dataset=c(rep("soils",5), rep("lakes",5)),
+              path=rep(c("environment~spatial",
+                         "species~spatial",
+                         "species~environment",
+                         "foodweb~species",
+                         "foodweb~environment"),2),
+              mean=0,
+              q025=0,
+              q975=0,
+              negative=0
+)
+
+df$mean = c(rowMeans(coef.est.soils),
+            rowMeans(coef.est.lakes)
+)
+df[1:5, 4:5] = t( apply( coef.est.soils, 1, function(x) quantile(x, probs=c(0.025, 0.975)) ) )
+df[6:10, 4:5] = t( apply( coef.est.lakes, 1, function(x) quantile(x, probs=c(0.025, 0.975)) ) )
+df$negative = c(rowSums(coef.est.soils<0)/boot.total, rowSums(coef.est.lakes<0)/boot.total)
+df[, 3:6] = round(df[, 3:6], digits=3)
+
+df
