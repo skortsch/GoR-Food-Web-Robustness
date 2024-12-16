@@ -1,0 +1,78 @@
+
+### NULL MODEL SCRIPT using the curveball algorithm ###
+
+#load packages, data and functions
+
+library(igraph)
+
+#load curveball null model
+# Null model constraints
+# 1. keeps the number of taxa per polygon fixed => fixed row sum
+# 2. keeps the number of time a species occurrs in polygons fixed => fixed column sum
+# 3. only constructs connected graphs. Connected graphs are needed to calculate modularity with the spinglass algorithm.
+# 4. species must have at least one prey item, but you can let some species have no prey item depending on the original data
+source("curveball.R") #Make sure the file MapTools is in the Working directory
+
+#curv function
+# The  curv function is used to iteratively apply the curveball algorithm to the site (could also be time) by species matrix 
+# This function takes an adjacency matrix and number of iterations as inputs and returns a dataframe 
+source("curv.R") #Make sure the file MapTools is in the Working directory
+
+#load the time by species matrix 
+poly<-read.table("clipboard") # you can change the name of course but here this is called poly
+
+#load the food web metaweb 
+fw<-read.table("fw.metaweb.baltic.txt")
+fw<-as.matrix(fw)
+
+# need to specify names of basal species, this example (9 species) is from the Barents Sea data set
+basal=colnames(poly)[1:9] # names of basal species, not to be randomised 
+
+model_curveball<-list()
+iter<-999  # no of iterations
+for (l in 1:iter){ # loop on randomisations
+  
+  null.model.curveball<-matrix(0, dim(poly)[1], dim(poly)[2]) 			# empty matrix with rows (number of rows are equal to the number of food webs) to be filled in with swapped elements (i.e. prey items)
+  
+  cat('iteration ',l,'\n')
+  
+  poly.ran<-curve_ball(poly) # use the swap alogorithm to create a new dataset (XX rows * XX potential species)
+  
+  i=1
+  while (i <= dim(poly)[1]){ 					# loop on the rows to check that they are valid, i.e. fullfil the constraints
+    
+    id.s<-which(poly.ran[i,]==1)  # species present in polygon i
+    fw.ids<-fw[id.s,id.s]         # reduced foodweb, with only species present
+    
+    # test for prey
+    n.prey=apply(fw.ids, 2, sum) # number of prey for ALL species in the reduced foodweb
+    zero.prey.list=names(n.prey[n.prey==0]) # list of species with no prey
+    test.4.zero.prey=(sum(zero.prey.list%in%basal==FALSE)<=0) # in Ecography paper: test no more than 1 non-basal species could have no prey
+    
+    # test for network unicity
+    ids.g<-graph.adjacency(fw.ids)	#identify unconnected graphs
+    cl<-clusters(ids.g)					    #one cluster means the graph is connected, if more clusters some species are singletons 
+    
+    if (test.4.zero.prey==TRUE & cl$no==1){ # test that the prey & connected criteria are fullfilled
+      cat('polygon',i,'passed \n') # if yes, move to the next polygon
+      i=i+1
+    }else{ # if no, reshuffle the species matrix and restart at polygon 1
+      cat('polygon',i,'failed, zero.prey species = ',sum(zero.prey.list%in%basal==FALSE),'nsg=',cl$no,'\t')
+      cat(zero.prey.list[zero.prey.list%in%basal==FALSE],'\n')
+      poly.ran<-curve_ball(poly) # use the swap alogorithm to create a new dataset (25 polygons * 233 potential species) 
+      i=1 
+    }
+  }
+  model_curveball[[l]]<- as.matrix(poly.ran) # the list of iterations
+}
+
+
+
+
+
+
+
+
+
+
+

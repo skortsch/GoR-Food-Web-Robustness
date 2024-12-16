@@ -1,0 +1,7 @@
+{
+    "installOptions": {
+        "installFromRepository": true,
+        "libraryPath": "C:/rlibs/4.2.2",
+        "installDependencies": true
+    }
+}
