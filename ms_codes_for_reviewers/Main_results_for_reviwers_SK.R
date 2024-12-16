@@ -381,7 +381,7 @@ uw.R50.th90<-matrix(NA, 34, 100)
 #Primary extinctions of X, Y skipped due to their prior extinction as secondary extinctions."
 #NOTE: Self explanatory. The extinction already happend, so was skipped in the order.
 
-webs<-uw.webs.100
+webs<-uw.webs.1000
 for (i in 1:100){
   a<-webs[[i]] 
   
@@ -475,19 +475,19 @@ uwR50.list<-list(uw.R50, uw.R50.th90, uw.R50.th80, uw.R50.th70, uw.R50.th60,
 #NOTE: Self explanatory. The extinction already happend, so was skipped in the order.
 
 #See file "w.R50list.RDS" for R50 results used in the manuscript for comparison.
-w.R50<-matrix(NA, 34, 1000)
-w.R50.th10<-matrix(NA, 34, 1000)
-w.R50.th20<-matrix(NA, 34, 1000)
-w.R50.th30<-matrix(NA, 34, 1000)
-w.R50.th40<-matrix(NA, 34, 1000)
-w.R50.th50<-matrix(NA, 34, 1000)
-w.R50.th60<-matrix(NA, 34, 1000)
-w.R50.th70<-matrix(NA, 34, 1000)
-w.R50.th80<-matrix(NA, 34, 1000)
-w.R50.th90<-matrix(NA, 34, 1000)
+w.R50<-matrix(NA, 34, 100)
+w.R50.th10<-matrix(NA, 34, 100)
+w.R50.th20<-matrix(NA, 34, 100)
+w.R50.th30<-matrix(NA, 34, 100)
+w.R50.th40<-matrix(NA, 34, 100)
+w.R50.th50<-matrix(NA, 34, 100)
+w.R50.th60<-matrix(NA, 34, 100)
+w.R50.th70<-matrix(NA, 34, 100)
+w.R50.th80<-matrix(NA, 34, 100)
+w.R50.th90<-matrix(NA, 34, 100)
 
 webs<-w.webs.1000
-for (i in 1:1000){
+for (i in 1:100){
   a<-webs[[i]]
   
   for (j in 1:34) {
